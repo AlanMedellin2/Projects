@@ -5,6 +5,10 @@
 #include <algorithm>
 #include "struct.h"
 
+typedef std::vector<std::pair<int,int>> VectorCamino;
+typedef std::pair<int,int> coord;
+
+
 //Definiciones previas de funciones (pasar a .h y .cpp despues)
 void imprimirMapaTipo(const Mapa& mapaImprimir, const int& ancho, const int& largo);
 
@@ -12,9 +16,7 @@ void limpiarPantalla();
 
 void reiniciarMapa(Mapa& mapaGlobal,const int& ancho, const int& largo);
 
-int calcularHeu(std::pair<int,int> point1,std::pair<int,int> point2);
-
-void aplicarHeu(Mapa& mapaGlobal,std::pair<int,int>& startPoint,std::pair<int,int>& goalPoint,
+void aplicarHeu(Mapa& mapaGlobal,coord& startPoint,coord& goalPoint,
     const int& ancho, const int& largo);
 
 bool definirMapa(int& ancho,int& largo,int& numObs,std::pair<int,int>& startPoint,
@@ -22,14 +24,14 @@ bool definirMapa(int& ancho,int& largo,int& numObs,std::pair<int,int>& startPoin
 
 void imprimirMapaHeu(const Mapa& mapaImprimir, const int& ancho, const int& largo);
 
-void evaluarVecinos(std::pair<int,int>& actualPoint,std::pair<int,int>& up,std::pair<int,int>& down,std::pair<int,int>& left,std::pair<int,int>& right,
+bool caminoDisponible(std::vector<bool>& disponibles);
+
+std::vector<bool> evaluarVecinos(std::pair<int,int>& actualPoint,std::pair<int,int>& up,std::pair<int,int>& down,std::pair<int,int>& left,std::pair<int,int>& right,
     int* ptrA,int* ptrL,Mapa& mapaGlobal);
 
 void Astar(Mapa& mapaGlobal,std::pair<int,int>& actualPoint,std::pair<int,int>& goalPoint,
     int ancho,int largo);
 
-void imprimirPose(const Mapa& mapaImprimir, const int& ancho, const int& largo,
-     const std::pair<int,int>& actualPoint);
 
 //Funciones 
 
@@ -168,18 +170,12 @@ bool definirMapa(int& ancho,int& largo,int& numObs,std::pair<int,int>& startPoin
     return true;
 }
 
-int calcularHeu(std::pair<int,int> point1,std::pair<int,int> point2)
-{
-    int heursitica{0};
-    heursitica= (abs(point1.first-point2.first))+(abs(point1.second-point2.second));
-    return heursitica;
-}
 
 void imprimirMapaTipo(const Mapa& mapaImprimir, const int& ancho, const int& largo)
 {
     Casilla valor{};
     std::cout<<'\n';
-    std::cout<<"Mapa: e->espacio libre, o->obstaculo, s->start, g->goal\n";
+    std::cout<<"Mapa: e->espacio libre, o->obstaculo, s->start, g->goal, p->path\n";
 
     for(int i{0};i<ancho;i++)
     {
@@ -194,7 +190,6 @@ void imprimirMapaTipo(const Mapa& mapaImprimir, const int& ancho, const int& lar
     std::cout<<'\n';
 
 }
-
 
 void limpiarPantalla()
 {
@@ -214,7 +209,7 @@ void reiniciarMapa(Mapa& mapaGlobal,const int& ancho, const int& largo)
     //limpiarPantalla();
 }
 
-void aplicarHeu(Mapa& mapaGlobal,std::pair<int,int>& startPoint,std::pair<int,int>& goalPoint,
+void aplicarHeu(Mapa& mapaGlobal,coord& startPoint,coord& goalPoint,
     const int& ancho, const int& largo)
 {
     int heuristica{0};
@@ -227,12 +222,22 @@ void aplicarHeu(Mapa& mapaGlobal,std::pair<int,int>& startPoint,std::pair<int,in
             newPoint.first=i;
             newPoint.second=j;
 
-            heuristica=calcularHeu(goalPoint,newPoint);
+            heuristica= (abs(goalPoint.first-newPoint.first))+(abs(goalPoint.second-newPoint.second));
             mapaGlobal.map[i][j].heuristica=heuristica;
         }
     }
+}
 
-
+bool caminoDisponible(std::vector<bool>& disponibles)
+{
+    for(int i{0};i<4;i++)
+    {
+        if(disponibles[i]==true)
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 void imprimirMapaHeu(const Mapa& mapaImprimir, const int& ancho, const int& largo)
@@ -254,7 +259,6 @@ void imprimirMapaHeu(const Mapa& mapaImprimir, const int& ancho, const int& larg
     std::cout<<'\n';
 }
 
-
 void Astar(Mapa& mapaGlobal,std::pair<int,int>& actualPoint,std::pair<int,int>& goalPoint,
     int ancho,int largo)
 {
@@ -263,103 +267,133 @@ void Astar(Mapa& mapaGlobal,std::pair<int,int>& actualPoint,std::pair<int,int>& 
     std::pair<int,int> left={};
     std::pair<int,int> right={};
 
-    std::vector<std::pair<int,int>> path ={};
+    VectorCamino path ={};
 
     int* ptrAncho = &ancho;
     int* ptrLargo = &largo;
     std::pair<int,int> opciones[4]={};
 
-    //Matriz para marcar las celdas visitadas, valores iniciales false
-    bool visitados[ancho][largo]={};
     //Posicion inicial visitada
-    visitados[actualPoint.first][actualPoint.second]=true;
+    mapaGlobal.map[actualPoint.first][actualPoint.second].visitado=true;
+    path.push_back(actualPoint);
 
     int dist{0}; // distancia que toma llegar desde el start hasta la casilla que sige
     int temporal{0};
     int heuMinima{0};
     int indice{0};
-    bool sinCamino=false;
+    std::vector<bool> disponibles(4);
+    int contadorDisponibles{0};
+    bool flagContinuar{false};
+    bool terminar {false};
+    int sizeVec {0};
+
 
     while((mapaGlobal.map[actualPoint.first][actualPoint.second].tipo!='g'))
     {
+        continuarAqui:
+
+        dist++;// distancia que toma llegar desde el start hasta la casilla que sigue
+        temporal=0;
+        heuMinima=99999;
+        indice=0;
+        contadorDisponibles=0;
+
         //Se evaluan los vecinos del punto actual, para saber a donde puede ir
-        evaluarVecinos(actualPoint,up,down,left,right,ptrAncho,ptrLargo,mapaGlobal);
+        disponibles = evaluarVecinos(actualPoint,up,down,left,right,ptrAncho,ptrLargo,mapaGlobal);
 
         /*/Ahora vamos a calcular el costo de ir a un vecino tomando en cuenta la distancia y la heuristica
         quedandonos con el de menor costo
         */
         opciones[0] = up;
-        opciones[1] = down;
-        opciones[2] = left;
+        opciones[1] = left;
+        opciones[2] = down;
         opciones[3] = right;
 
-        
-        dist++;// distancia que toma llegar desde el start hasta la casilla que sigue
-        temporal=0;
-        heuMinima=99990;
-        indice=0;
-
         //Si el punto actual tiene al menos un vecino disponible entonces seguimos con el codigo
+        flagContinuar = caminoDisponible(disponibles);
 
+        if (flagContinuar==false) //Si no hay camino, vamos a retroceder en el vector de path
+        {
+            if(path.empty()) //Si el vector esta vacio, ya no hay caminos disponibles
+            {
+                std::cout<<"Ya no hay caminos disponibles \n";
+                return;
+            }else
+            {
+                sizeVec = path.size();
+                int indice{sizeVec-1}; //Tamano del vector de camino
+
+                //Vamos a recorrer el camino hacia atras, hasta encontrar uno con vecinos disponibles por explorar
+                for(int i{indice};i>=0;i--)
+                {
+                    disponibles = evaluarVecinos(path[i],up,down,left,right,ptrAncho,ptrLargo,mapaGlobal);
+                    flagContinuar = caminoDisponible(disponibles);
+                    if(flagContinuar==true)
+                    {
+                        actualPoint = path[i];
+                        goto contunuarAqui;
+                    }
+                    else{
+                        path.pop_back();
+                    }
+                }
+                //Si no se encontro un punto con vecinos disponibles
+                return;
+            }
+        }
+
+
+        contunuarAqui:
         // F = G + H
         for(int i{0};i<4;i++)
         {
 
-            /*Cuando se evaluaron los vecinos se asigno un valor de -1 cuando una casilla no era accesible
-            entonces si eso es negativo saltara a la siguiente*/
-            if(opciones[i].first<0) //Si la casilla no se puede acceder, pero todavia no sabemos porque
+            /* */
+            if(disponibles[i]==true) 
             {
-                continue;
-            }
-            else if(mapaGlobal.map[opciones[i].first][opciones[i].second].tipo=='o') 
-            {
-                visitados[opciones[i].first][opciones[i].second] = true;
-                continue;
-            }
-            
-            //Aqui ya se calcula el valor que tomaria llegar a una casilla
-            temporal = dist+mapaGlobal.map[opciones[i].first][opciones[i].second].heuristica;
-            /*Se actualiza cuando se encuentra un valor mas pequeno a donde ir y se guarda el indice, siempre y cuando no haya
-            sido visitado antes*/
-            if((visitados[opciones[i].first][opciones[i].second]==false) && (temporal<heuMinima))
-            {
-                heuMinima=temporal;
-                indice = i;
+                //Aqui ya se calcula el valor que tomaria llegar a una casilla
+                temporal = dist+mapaGlobal.map[opciones[i].first][opciones[i].second].heuristica;
+                /*Se actualiza cuando se encuentra un valor mas pequeno a donde ir y se guarda el indice, siempre y cuando no haya
+                sido visitado antes*/
+                if(temporal<heuMinima)
+                {
+                    heuMinima=temporal;
+                    indice = i;
+
+                }
             }
         }
 
-        /*Si todo va bien ya tendriamos las coordenadas con el menor costo, revisamos que no haya sido visitada
+        /*Si todo va bien ya tendriamos las coordenadas con el menor costo
         Actualizamos la posicion actual y marcamos las coordenadas como visitada*/
 
         actualPoint = opciones[indice];
-        visitados[actualPoint.first][actualPoint.second] = true;
+        mapaGlobal.map[actualPoint.first][actualPoint.second].visitado = true;
+
         //Ahora vamos agregando el nodo actual a path
         path.push_back(actualPoint);
+
     }
 
     std::cout<<"Se encontro un caminoooo!!!!!!!!!!!!!!!!!\n";
 
-    bool valor{0};
+    sizeVec = path.size();
 
-    for(int i{0};i<ancho;i++)
+    for(int i{0};i<sizeVec;i++)
     {
-        for(int j{0};j<largo;j++)
-        {
-            valor = visitados[i][j];
-
-            if(valor==1){
-                std::cout<<'v'<<" ";
-            }else{
-                std::cout<<'n'<<" ";
-            }
-        }
-        std::cout<<'\n';
+        mapaGlobal.map[path[i].first][path[i].second].tipo = 'p';
     }
+
+    imprimirMapaTipo(mapaGlobal,ancho,largo);
+
     std::cout<<'\n';
+
+    return;
+
 }
 
-//En esta funcion falta implementar que los obstaculos tambien son innacesibles
-void evaluarVecinos(std::pair<int,int>& actualPoint,std::pair<int,int>& up,std::pair<int,int>& down,std::pair<int,int>& left,std::pair<int,int>& right,
+
+std::vector<bool> evaluarVecinos(std::pair<int,int>& actualPoint,std::pair<int,int>& up,std::pair<int,int>& down,std::pair<int,int>& left,std::pair<int,int>& right,
     int* ptrA,int* ptrL,Mapa& mapaGlobal)
 {
      /*Aqui tenemos que evaluar si al momento de buscar los vecinos estos no se salgan del mapa 
@@ -373,88 +407,70 @@ void evaluarVecinos(std::pair<int,int>& actualPoint,std::pair<int,int>& up,std::
     5)la(s) casilla(s) de al lado == obstaculo
     */
 
+    std::vector<bool> disponibles(4); //Inicializado por defecto en false
+
     if(actualPoint.first>0) //si puede ir para arriba
     {
-        //Verificamos que la coordenada que vamos a poner no es un obstaculo
-        if(mapaGlobal.map[actualPoint.first-1][actualPoint.second].tipo!='o')
+        
+        up.first = actualPoint.first-1;
+        up.second = actualPoint.second;
+        if(mapaGlobal.map[up.first][up.second].visitado==false && mapaGlobal.map[up.first][up.second].tipo!='o')
         {
-            up.first = actualPoint.first-1;
-            up.second = actualPoint.second;
-            mapaGlobal.map[actualPoint.first][actualPoint.second].vecinosDisponibles++;
-        }else //Si es un obstaculo le asignamos estos valores que nos ayudara mas tarde
-        {
-            up.first = -(actualPoint.first-1);
-            up.second = -(actualPoint.second);
+            disponibles[0] = true;
         }
-    }else//si esta, entonces no puede ir para arriba
-    {
-        up.first = -99999;
-        up.second = -99999;
     }
-    
+
+    if(actualPoint.second>0)  //si puede ir para la izquierda
+    {
+        
+        left.first = actualPoint.first;
+        left.second = actualPoint.second-1;
+        if(mapaGlobal.map[left.first][left.second].visitado==false && mapaGlobal.map[left.first][left.second].tipo!='o')
+        {
+            disponibles[1] = true;
+        }
+        
+    }
+
+
     if(actualPoint.first<((*ptrA)-1)) // si puede ir para abajo
     {
-        //Verificamos que la coordenada que vamos a poner no es un obstaculo
-        if((mapaGlobal.map[actualPoint.first+1][actualPoint.second].tipo) !='o')
+        
+        down.first = actualPoint.first+1;
+        down.second = actualPoint.second;
+        if(mapaGlobal.map[down.first][down.second].visitado==false && mapaGlobal.map[down.first][down.second].tipo!='o')
         {
-            down.first = actualPoint.first+1;
-            down.second = actualPoint.second;
-            //Vamos contando los vecinos disponibles de cada celda
-            mapaGlobal.map[actualPoint.first][actualPoint.second].vecinosDisponibles++;
-        }else //Si es un obstaculo le asignamos estos valores que nos ayudara mas tarde
-        {
-            down.first = -(actualPoint.first+1);
-            down.second = -(actualPoint.second);
-        }
-    }else //si esta, entonces no puede ir para abajo
-    {
-        down.first = -99999;
-        down.second = -99999;
-    }
-    
-
-    if(actualPoint.second>0)
-    {
-        if((mapaGlobal.map[actualPoint.first][actualPoint.second-1].tipo) != 'o')
-        {
-            left.first = actualPoint.first;
-            left.second = actualPoint.second-1;
-            //Vamos contando los vecinos disponibles de cada celda
-            mapaGlobal.map[actualPoint.first][actualPoint.second].vecinosDisponibles++;
-        }else
-        {
-            left.first = -(actualPoint.first);
-            left.second = -(actualPoint.second-1);
+            disponibles[2] = true;
         }
         
-    }else
-    {
-        left.first = -99999;
-        left.second = -99999;
     }
 
 
-    if(actualPoint.second<((*ptrL)-1))
+    if(actualPoint.second<((*ptrL)-1))  //si puede ir para la derecha
     {
-        if((mapaGlobal.map[actualPoint.first][actualPoint.second+1].tipo) != 'o')
+       
+        right.first = actualPoint.first;
+        right.second = actualPoint.second+1;
+
+        if(mapaGlobal.map[right.first][right.second].visitado==false && mapaGlobal.map[right.first][right.second].tipo!='o')
         {
-            right.first = actualPoint.first;
-            right.second = actualPoint.second+1;
-            //Vamos contando los vecinos disponibles de cada celda
-            mapaGlobal.map[actualPoint.first][actualPoint.second].vecinosDisponibles++;
-        }else
-        {
-            right.first = -(actualPoint.first);
-            right.second = -(actualPoint.second+1);
+            disponibles[3] = true;
         }
-        
-    }else
-    {
-        right.first = -99999;
-        right.second = -99999;
     }
+
+    return disponibles;
 }
 
+void evaluarCamino(std::pair<int,int> opciones[4])
+{
+    for(int i{0};i<4;i++)
+    {
+        if(opciones[i].first==-1)
+        {
+
+        }
+    }
+}
 
 int main(){
 
