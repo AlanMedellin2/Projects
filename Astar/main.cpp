@@ -290,7 +290,6 @@ void Astar(Mapa& mapaGlobal,std::pair<int,int>& actualPoint,std::pair<int,int>& 
 
     while((mapaGlobal.map[actualPoint.first][actualPoint.second].tipo!='g'))
     {
-        continuarAqui:
 
         dist++;// distancia que toma llegar desde el start hasta la casilla que sigue
         temporal=0;
