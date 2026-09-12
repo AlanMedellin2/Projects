@@ -340,7 +340,7 @@ void Astar(Mapa& mapaGlobal,std::pair<int,int>& actualPoint,std::pair<int,int>& 
 
     }
 
-    std::cout<<"Se encontro un caminoooo!!!!!!!!!!!!!!!!!\n";
+    std::cout<<"Se encontro un caminoooo!\n";
     path.pop_back();
 
     sizeVec = path.size();
