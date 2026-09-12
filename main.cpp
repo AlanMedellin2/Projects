@@ -20,10 +20,6 @@ int main(){
     {
         flag = definirMapa(numObs,startPoint,goalPoint,mapaGlobal);
     }while (flag==0);
-
-    /*Para este punto ya debemos tener el mapa correcto
-    Incluyendo obstaculos, punto de inicio y meta
-    Tomando en cuenta que el mapa se paso por refrencia entonces ya esta todo guardado ahi*/
     
     imprimirMapaTipo(mapaGlobal);
 
@@ -48,7 +44,6 @@ int main(){
 
 
     Astar(mapaGlobal,startPoint,goalPoint);
-    /*LISTOOOO, ahora que sigue? APLICAR A*!!!*/
 
     sf::RenderWindow window(sf::VideoMode(800, 600), "A* Visualizer");
 
